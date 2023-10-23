@@ -45,7 +45,7 @@ class OpenAIInvocationLayer(PromptModelInvocationLayer):
         [documentation](https://platform.openai.com/docs/api-reference/completions/create).
         """
         super().__init__(model_name_or_path)
-        if not isinstance(api_key, str) or len(api_key) == 0:
+        if not isinstance(api_key, str) or not api_key:
             raise OpenAIError(
                 f"api_key {api_key} must be a valid OpenAI key. Visit https://openai.com/api/ to get one."
             )
@@ -145,8 +145,7 @@ class OpenAIInvocationLayer(PromptModelInvocationLayer):
         if not stream:
             res = openai_request(url=self.url, headers=self.headers, payload=payload)
             _check_openai_finish_reason(result=res, payload=payload)
-            responses = [ans["text"].strip() for ans in res["choices"]]
-            return responses
+            return [ans["text"].strip() for ans in res["choices"]]
         else:
             response = openai_request(
                 url=self.url, headers=self.headers, payload=payload, read_response=False, stream=True
@@ -161,8 +160,7 @@ class OpenAIInvocationLayer(PromptModelInvocationLayer):
             for event in client.events():
                 if event.data != TokenStreamingHandler.DONE_MARKER:
                     event_data = json.loads(event.data)
-                    token: str = self._extract_token(event_data)
-                    if token:
+                    if token := self._extract_token(event_data):
                         tokens.append(stream_handler(token, event_data=event_data["choices"]))
         finally:
             client.close()
@@ -194,13 +192,14 @@ class OpenAIInvocationLayer(PromptModelInvocationLayer):
 
         if USE_TIKTOKEN:
             tokenized_payload = self._tokenizer.encode(prompt)
-            decoded_string = self._tokenizer.decode(tokenized_payload[: self.max_tokens_limit - n_answer_tokens])
-        else:
-            tokenized_payload = self._tokenizer.tokenize(prompt)
-            decoded_string = self._tokenizer.convert_tokens_to_string(
+            return self._tokenizer.decode(
                 tokenized_payload[: self.max_tokens_limit - n_answer_tokens]
             )
-        return decoded_string
+        else:
+            tokenized_payload = self._tokenizer.tokenize(prompt)
+            return self._tokenizer.convert_tokens_to_string(
+                tokenized_payload[: self.max_tokens_limit - n_answer_tokens]
+            )
 
     @classmethod
     def supports(cls, model_name_or_path: str, **kwargs) -> bool:

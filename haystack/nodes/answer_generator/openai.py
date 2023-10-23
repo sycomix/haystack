@@ -123,7 +123,9 @@ class OpenAIAnswerGenerator(BaseGenerator):
         else:
             # Check for required prompts
             required_params = ["context", "query"]
-            if not all(p in prompt_template.prompt_params for p in required_params):
+            if any(
+                p not in prompt_template.prompt_params for p in required_params
+            ):
                 raise ValueError(
                     "The OpenAIAnswerGenerator requires a PromptTemplate that has `context` and "
                     "`query` in its `prompt_params`. Supply a different `prompt_template` or "
@@ -132,10 +134,11 @@ class OpenAIAnswerGenerator(BaseGenerator):
 
             # Check for unsupported prompt parameters
             optional_params = ["examples_context", "examples"]
-            unknown_params = []
-            for p in prompt_template.prompt_params:
-                if p not in set(required_params + optional_params):
-                    unknown_params.append(p)
+            unknown_params = [
+                p
+                for p in prompt_template.prompt_params
+                if p not in set(required_params + optional_params)
+            ]
             if len(unknown_params) > 1:
                 raise ValueError(
                     f"The provided PromptTemplate has the prompt parameters, {unknown_params}, that are not supported "
@@ -230,16 +233,13 @@ class OpenAIAnswerGenerator(BaseGenerator):
         _check_openai_finish_reason(result=res, payload=payload)
         generated_answers = [ans["text"] for ans in res["choices"]]
         answers = self._create_answers(generated_answers, input_docs, prompt=prompt)
-        result = {"query": query, "answers": answers}
-        return result
+        return {"query": query, "answers": answers}
 
     @staticmethod
     def _create_context(documents: List[Document], join_str: str = " ") -> str:
         """Join the documents to create a single context to be used in the PromptTemplate."""
         doc_contents = [doc.content for doc in documents]
-        # We reverse the docs to put the most relevant documents at the bottom of the context
-        context = join_str.join(reversed(doc_contents))
-        return context
+        return join_str.join(reversed(doc_contents))
 
     def _fill_prompt(self, query: str, documents: List[Document]) -> str:
         """Fills in the `prompt_template` with its `prompt_params` and returns the full prompt."""
@@ -253,8 +253,7 @@ class OpenAIAnswerGenerator(BaseGenerator):
         ):
             kwargs["examples_context"] = self.examples_context
             kwargs["examples"] = example_prompts
-        full_prompt = next(self.prompt_template.fill(**kwargs))
-        return full_prompt
+        return next(self.prompt_template.fill(**kwargs))
 
     def _build_prompt_within_max_length(self, query: str, documents: List[Document]) -> Tuple[str, List[Document]]:
         """

@@ -88,12 +88,12 @@ class _OpenAIEmbeddingEncoder(_BaseEmbeddingEncoder):
 
         if USE_TIKTOKEN:
             tokenized_payload = self._tokenizer.encode(text)
-            decoded_string = self._tokenizer.decode(tokenized_payload[: self.max_seq_len])
+            return self._tokenizer.decode(tokenized_payload[: self.max_seq_len])
         else:
             tokenized_payload = self._tokenizer.tokenize(text)
-            decoded_string = self._tokenizer.convert_tokens_to_string(tokenized_payload[: self.max_seq_len])
-
-        return decoded_string
+            return self._tokenizer.convert_tokens_to_string(
+                tokenized_payload[: self.max_seq_len]
+            )
 
     def embed(self, model: str, text: List[str]) -> np.ndarray:
         if self.api_key is None:

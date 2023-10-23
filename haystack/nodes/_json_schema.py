@@ -90,8 +90,7 @@ def get_typed_signature(call: Callable[..., Any]) -> inspect.Signature:
         )
         for param in signature.parameters.values()
     ]
-    typed_signature = inspect.Signature(typed_params)
-    return typed_signature
+    return inspect.Signature(typed_params)
 
 
 # From FastAPI's internals
@@ -147,18 +146,17 @@ def handle_optional_params(param_fields: List[inspect.Parameter], params_schema:
     for param in optional_params:
         param_dict = params_schema["properties"][param.name]
         type_ = param_dict.pop("type", None)
-        if type_ is not None:
-            if "items" in param_dict:
-                items = param_dict.pop("items")
-                param_dict["anyOf"] = [{"type": type_, "items": items}, {"type": "null"}]
-            else:
-                param_dict["anyOf"] = [{"type": type_}, {"type": "null"}]
-        else:
+        if type_ is None:
             anyof_list = param_dict.pop("anyOf", None)
             if anyof_list is not None:
                 anyof_list = list(sorted(anyof_list, key=lambda x: x["type"]))
                 anyof_list.append({"type": "null"})
                 param_dict["anyOf"] = anyof_list
+        elif "items" in param_dict:
+            items = param_dict.pop("items")
+            param_dict["anyOf"] = [{"type": type_, "items": items}, {"type": "null"}]
+        else:
+            param_dict["anyOf"] = [{"type": type_}, {"type": "null"}]
     return params_schema
 
 
@@ -279,7 +277,7 @@ def get_json_schema(filename: str, version: str, modules: Optional[List[str]] = 
         schema_definitions.update(node_definition)
         node_refs.append(node_ref)
 
-    pipeline_schema = {
+    return {
         "$schema": "http://json-schema.org/draft-07/schema",
         "$id": f"{SCHEMA_URL}{filename}",
         "title": "Haystack Pipeline",
@@ -313,7 +311,11 @@ def get_json_schema(filename: str, version: str, modules: Optional[List[str]] = 
                 "items": {
                     "type": "object",
                     "properties": {
-                        "name": {"title": "Name", "description": "Name of the pipeline.", "type": "string"},
+                        "name": {
+                            "title": "Name",
+                            "description": "Name of the pipeline.",
+                            "type": "string",
+                        },
                         "nodes": {
                             "title": "Nodes",
                             "description": "Nodes to be used by this particular pipeline",
@@ -345,10 +347,16 @@ def get_json_schema(filename: str, version: str, modules: Optional[List[str]] = 
                                             "prev_version": {"type": "string"},
                                             "init_args": {"type": "array"},
                                             "init_kwargs": {"type": "object"},
-                                            "router_prefix": {"type": "string"},
-                                            "ray_actor_options": {"type": "object"},
+                                            "router_prefix": {
+                                                "type": "string"
+                                            },
+                                            "ray_actor_options": {
+                                                "type": "object"
+                                            },
                                             "user_config": {"type": {}},
-                                            "max_concurrent_queries": {"type": "integer"},
+                                            "max_concurrent_queries": {
+                                                "type": "integer"
+                                            },
                                         },
                                         "additionalProperties": True,
                                     },
@@ -374,17 +382,28 @@ def get_json_schema(filename: str, version: str, modules: Optional[List[str]] = 
                     "pipelines": {
                         "title": "Pipelines",
                         "items": {
-                            "properties": {"nodes": {"items": {"not": {"required": ["serve_deployment_kwargs"]}}}}
+                            "properties": {
+                                "nodes": {
+                                    "items": {
+                                        "not": {
+                                            "required": [
+                                                "serve_deployment_kwargs"
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
                         },
                     }
                 },
             },
-            {"properties": {"extras": {"enum": ["ray"]}}, "required": ["extras"]},
+            {
+                "properties": {"extras": {"enum": ["ray"]}},
+                "required": ["extras"],
+            },
         ],
         "definitions": schema_definitions,
     }
-
-    return pipeline_schema
 
 
 def inject_definition_in_schema(node_class: Type[BaseComponent], schema: Dict[str, Any]) -> Dict[str, Any]:

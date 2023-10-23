@@ -120,7 +120,7 @@ class _SentenceTransformersEmbeddingEncoder(_BaseEmbeddingEncoder):
         # e.g. 'roberta-base-nli-stsb-mean-tokens'
         try:
             from sentence_transformers import SentenceTransformer
-        except (ImportError, ModuleNotFoundError) as ie:
+        except ImportError as ie:
             from haystack.utils.import_utils import _optional_component_not_installed
 
             _optional_component_not_installed(__name__, "sentence", ie)
@@ -137,12 +137,12 @@ class _SentenceTransformersEmbeddingEncoder(_BaseEmbeddingEncoder):
             )
 
     def embed(self, texts: Union[List[str], str]) -> np.ndarray:
-        # texts can be a list of strings
-        # get back list of numpy embedding vectors
-        emb = self.embedding_model.encode(
-            texts, batch_size=self.batch_size, show_progress_bar=self.show_progress_bar, convert_to_numpy=True
+        return self.embedding_model.encode(
+            texts,
+            batch_size=self.batch_size,
+            show_progress_bar=self.show_progress_bar,
+            convert_to_numpy=True,
         )
-        return emb
 
     def embed_queries(self, queries: List[str]) -> np.ndarray:
         """
@@ -316,10 +316,12 @@ class _RetribertEmbeddingEncoder(_BaseEmbeddingEncoder):
 
     def _create_dataloader(self, text_to_encode: List[dict]) -> NamedDataLoader:
         dataset, tensor_names = self.dataset_from_dicts(text_to_encode)
-        dataloader = NamedDataLoader(
-            dataset=dataset, sampler=SequentialSampler(dataset), batch_size=self.batch_size, tensor_names=tensor_names
+        return NamedDataLoader(
+            dataset=dataset,
+            sampler=SequentialSampler(dataset),
+            batch_size=self.batch_size,
+            tensor_names=tensor_names,
         )
-        return dataloader
 
     def dataset_from_dicts(self, dicts: List[dict]):
         texts = [x["text"] for x in dicts]
@@ -394,7 +396,7 @@ class _CohereEmbeddingEncoder(_BaseEmbeddingEncoder):
             raise CohereUnauthorizedError(f"Invalid Cohere API key. {response.text}")
         if response.status_code != 200:
             raise CohereError(response.text, status_code=response.status_code)
-        generated_embeddings = [e for e in res["embeddings"]]
+        generated_embeddings = list(res["embeddings"])
         return np.array(generated_embeddings)
 
     def embed_batch(self, text: List[str]) -> np.ndarray:

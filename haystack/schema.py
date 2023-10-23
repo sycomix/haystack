@@ -145,9 +145,9 @@ class Document:
             if attr.startswith("meta."):
                 meta_key = attr.split(".", maxsplit=1)[1]
                 if meta_key in self.meta:
-                    final_hash_key += ":" + str(self.meta[meta_key])
+                    final_hash_key += f":{str(self.meta[meta_key])}"
             else:
-                final_hash_key += ":" + str(getattr(self, attr))
+                final_hash_key += f":{str(getattr(self, attr))}"
 
         if final_hash_key == "":
             raise ValueError(
@@ -479,11 +479,7 @@ class Label:
         """
 
         # Create a unique ID (either new one, or one from user input)
-        if id:
-            self.id = str(id)
-        else:
-            self.id = str(uuid4())
-
+        self.id = str(id) if id else str(uuid4())
         if created_at is None:
             created_at = time.strftime("%Y-%m-%d %H:%M:%S")
         self.created_at = created_at
@@ -505,18 +501,16 @@ class Label:
         # TODO autofill answer.document_id if Document is provided
 
         self.pipeline_id = pipeline_id
-        if not meta:
-            self.meta = {}
-        else:
-            self.meta = meta
+        self.meta = {} if not meta else meta
         self.filters = filters
 
     @property
     def no_answer(self) -> Optional[bool]:
-        no_answer = None
-        if self.answer is not None:
-            no_answer = self.answer.answer is None or self.answer.answer.strip() == ""
-        return no_answer
+        return (
+            self.answer.answer is None or self.answer.answer.strip() == ""
+            if self.answer is not None
+            else None
+        )
 
     def to_dict(self):
         return asdict(self)
@@ -622,12 +616,15 @@ class MultiLabel:
             self._offsets_in_contexts = []
             for answer in answered:
                 if answer.offsets_in_document is not None:
-                    for span in answer.offsets_in_document:
-                        self._offsets_in_documents.append({"start": span.start, "end": span.end})
+                    self._offsets_in_documents.extend(
+                        {"start": span.start, "end": span.end}
+                        for span in answer.offsets_in_document
+                    )
                 if answer.offsets_in_context is not None:
-                    for span in answer.offsets_in_context:
-                        self._offsets_in_contexts.append({"start": span.start, "end": span.end})
-
+                    self._offsets_in_contexts.extend(
+                        {"start": span.start, "end": span.end}
+                        for span in answer.offsets_in_context
+                    )
         # There are two options here to represent document_ids:
         # taking the id from the document of each label or taking the document_id of each label's answer.
         # We take the former as labels without answers are allowed.
@@ -704,10 +701,7 @@ class MultiLabel:
 
     @classmethod
     def from_json(cls, data: Union[str, Dict[str, Any]]):
-        if type(data) == str:
-            dict_data = json.loads(data)
-        else:
-            dict_data = data
+        dict_data = json.loads(data) if type(data) == str else data
         dict_data["labels"] = [Label.from_dict(l) for l in dict_data["labels"]]
         return cls.from_dict(dict_data)
 
@@ -736,8 +730,7 @@ def _pydantic_dataclass_from_dict(dict: dict, pydantic_dataclass_type) -> Any:
         value = getattr(base_model, base_model_field_name)
         values[base_model_field_name] = value
 
-    dataclass_object = pydantic_dataclass_type(**values)
-    return dataclass_object
+    return pydantic_dataclass_type(**values)
 
 
 class NumpyEncoder(json.JSONEncoder):
@@ -1115,7 +1108,7 @@ class EvaluationResult:
         document_relevance_criterion: str = document_scope
         if document_scope in ["answer", "document_id_or_answer"]:
             document_relevance_criterion = answer_scope_to_doc_relevance_crit.get(answer_scope, document_scope)
-        elif answer_scope in answer_scope_to_doc_relevance_crit.keys():
+        elif answer_scope in answer_scope_to_doc_relevance_crit:
             logger.warning(
                 "You specified a non-answer document_scope together with a non-default answer_scope. "
                 "This may result in inconsistencies between answer and document metrics. "
@@ -1251,8 +1244,7 @@ class EvaluationResult:
             }
             df_records.append(query_metrics)
 
-        metrics_df = pd.DataFrame.from_records(df_records, index=multilabel_ids)
-        return metrics_df
+        return pd.DataFrame.from_records(df_records, index=multilabel_ids)
 
     def _get_documents_df(self):
         document_dfs = [
@@ -1261,8 +1253,7 @@ class EvaluationResult:
         if len(document_dfs) != 1:
             raise ValueError("cannot detect retriever dataframe")
         documents_df = document_dfs[0]
-        documents_df = documents_df[documents_df["type"] == "document"]
-        return documents_df
+        return documents_df[documents_df["type"] == "document"]
 
     def _calculate_document_metrics(
         self,
@@ -1398,7 +1389,13 @@ class EvaluationResult:
             gold_document_ids = [id for id in gold_document_ids if id != "00"]
 
             num_labels = len(gold_document_ids)
-            num_matched_labels = len(set(idx for idxs in relevant_rows["matched_label_idxs"] for idx in idxs))
+            num_matched_labels = len(
+                {
+                    idx
+                    for idxs in relevant_rows["matched_label_idxs"]
+                    for idx in idxs
+                }
+            )
             num_missing_labels = num_labels - num_matched_labels
 
             relevance_criterion_ids = list(relevant_rows["document_id"].values)
@@ -1516,25 +1513,27 @@ class EvaluationResult:
         ]
 
         def safe_literal_eval(x: str) -> Any:
-            if x == "":
-                return None
-            return ast.literal_eval(x)
+            return None if not x else ast.literal_eval(x)
 
         converters = dict.fromkeys(cols_to_convert, safe_literal_eval)
         default_read_csv_kwargs = {"converters": converters, "header": 0}
-        read_csv_kwargs = {**default_read_csv_kwargs, **read_csv_kwargs}
+        read_csv_kwargs = default_read_csv_kwargs | read_csv_kwargs
         node_results = {file.stem: pd.read_csv(file, **read_csv_kwargs) for file in csv_files}
         # backward compatibility mappings
         for df in node_results.values():
             df.rename(columns={"gold_document_contents": "gold_contexts", "content": "context"}, inplace=True)
             # convert single document_id to list
-            if "answer" in df.columns and "document_id" in df.columns and not "document_ids" in df.columns:
+            if (
+                "answer" in df.columns
+                and "document_id" in df.columns
+                and "document_ids" not in df.columns
+            ):
                 df["document_ids"] = df["document_id"].apply(lambda x: [x] if x not in [None, "None"] else [])
                 df.drop(columns=["document_id"], inplace=True)
             if (
                 "answer" in df.columns
                 and "custom_document_id" in df.columns
-                and not "custom_document_ids" in df.columns
+                and "custom_document_ids" not in df.columns
             ):
                 df["custom_document_ids"] = df["custom_document_id"].apply(
                     lambda x: [x] if x not in [None, "None"] else []

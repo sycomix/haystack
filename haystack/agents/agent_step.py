@@ -75,8 +75,7 @@ class AgentStep:
         :param tool_pattern: The regex pattern to extract the tool name and the tool input from the PromptNode response.
         :return: A tuple containing the tool name and the tool input.
         """
-        tool_match = re.search(tool_pattern, self.prompt_node_response)
-        if tool_match:
+        if tool_match := re.search(tool_pattern, self.prompt_node_response):
             tool_name = tool_match.group(1)
             tool_input = tool_match.group(3)
             return tool_name.strip('" []\n').strip(), tool_input.strip('" \n')
@@ -101,20 +100,18 @@ class AgentStep:
                 self.max_steps,
                 query,
             )
+        elif final_answer := self.extract_final_answer():
+            answer = {
+                "query": query,
+                "answers": [Answer(answer=final_answer, type="generative")],
+                "transcript": self.transcript,
+            }
         else:
-            final_answer = self.extract_final_answer()
-            if not final_answer:
-                logger.warning(
-                    "Final answer pattern (%s) not found in PromptNode response (%s).",
-                    self.final_answer_pattern,
-                    self.prompt_node_response,
-                )
-            else:
-                answer = {
-                    "query": query,
-                    "answers": [Answer(answer=final_answer, type="generative")],
-                    "transcript": self.transcript,
-                }
+            logger.warning(
+                "Final answer pattern (%s) not found in PromptNode response (%s).",
+                self.final_answer_pattern,
+                self.prompt_node_response,
+            )
         return answer
 
     def extract_final_answer(self) -> Optional[str]:
@@ -125,8 +122,9 @@ class AgentStep:
         if not self.is_last():
             raise AgentError("Cannot extract final answer from non terminal step.")
 
-        final_answer_match = re.search(self.final_answer_pattern, self.prompt_node_response)
-        if final_answer_match:
+        if final_answer_match := re.search(
+            self.final_answer_pattern, self.prompt_node_response
+        ):
             final_answer = final_answer_match.group(1)
             return final_answer.strip('" ')
         return None

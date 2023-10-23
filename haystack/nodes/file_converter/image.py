@@ -8,7 +8,7 @@ try:
     import pytesseract
     from PIL.PpmImagePlugin import PpmImageFile
     from PIL import Image
-except (ImportError, ModuleNotFoundError) as ie:
+except ImportError as ie:
     from haystack.utils.import_utils import _optional_component_not_installed
 
     _optional_component_not_installed(__name__, "ocr", ie)
@@ -164,5 +164,4 @@ class ImageToTextConverter(BaseConverter):
 
         :param image: input image file
         """
-        text = [pytesseract.image_to_string(image, lang=self.tesseract_langs)]
-        return text
+        return [pytesseract.image_to_string(image, lang=self.tesseract_langs)]

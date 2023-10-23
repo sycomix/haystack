@@ -83,11 +83,11 @@ class SklearnQueryClassifier(BaseQueryClassifier):
         super().__init__()
 
         if isinstance(model_name_or_path, Path):
-            file_url = urllib.request.pathname2url(r"{}".format(model_name_or_path))
+            file_url = urllib.request.pathname2url(f"{model_name_or_path}")
             model_name_or_path = f"file:{file_url}"
 
         if isinstance(vectorizer_name_or_path, Path):
-            file_url = urllib.request.pathname2url(r"{}".format(vectorizer_name_or_path))
+            file_url = urllib.request.pathname2url(f"{vectorizer_name_or_path}")
             vectorizer_name_or_path = f"file:{file_url}"
 
         self.model = pickle.load(urllib.request.urlopen(model_name_or_path))
@@ -107,10 +107,7 @@ class SklearnQueryClassifier(BaseQueryClassifier):
         query_vector = self.vectorizer.transform([query])
 
         is_question: bool = self.model.predict(query_vector)[0]
-        if is_question:
-            return {}, "output_1"
-        else:
-            return {}, "output_2"
+        return ({}, "output_1") if is_question else ({}, "output_2")
 
     def run_batch(self, queries: List[str], batch_size: Optional[int] = None):  # type: ignore
         if batch_size is None:

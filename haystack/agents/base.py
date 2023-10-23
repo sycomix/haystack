@@ -90,26 +90,23 @@ class Tool:
         return self._process_result(result)
 
     def _process_result(self, result: Any) -> str:
-        # Base case: string or an empty container
         if not result or isinstance(result, str):
             return str(result)
-        # Recursive case: process the result based on its type and return the result
+        if isinstance(result, (tuple, list)):
+            return self._process_result(result[0] if result else [])
+        elif isinstance(result, dict):
+            if self.output_variable not in result:
+                raise ValueError(
+                    f"Tool {self.name} returned result {result} but "
+                    f"output variable '{self.output_variable}' not found."
+                )
+            return self._process_result(result[self.output_variable])
+        elif isinstance(result, Answer):
+            return self._process_result(result.answer)
+        elif isinstance(result, Document):
+            return self._process_result(result.content)
         else:
-            if isinstance(result, (tuple, list)):
-                return self._process_result(result[0] if result else [])
-            elif isinstance(result, dict):
-                if self.output_variable not in result:
-                    raise ValueError(
-                        f"Tool {self.name} returned result {result} but "
-                        f"output variable '{self.output_variable}' not found."
-                    )
-                return self._process_result(result[self.output_variable])
-            elif isinstance(result, Answer):
-                return self._process_result(result.answer)
-            elif isinstance(result, Document):
-                return self._process_result(result.content)
-            else:
-                return str(result)
+            return str(result)
 
 
 class Agent:
@@ -274,7 +271,7 @@ class Agent:
                         You can only pass parameters to tools that are pipelines, but not nodes.
         """
         try:
-            if not self.hash == self.last_hash:
+            if self.hash != self.last_hash:
                 self.last_hash = self.hash
                 send_event(event_name="Agent", event_properties={"llm.agent_hash": self.hash})
         except Exception as exc:
@@ -352,7 +349,7 @@ class Agent:
                         You can only pass parameters to tools that are pipelines but not nodes.
         """
         try:
-            if not self.hash == self.last_hash:
+            if self.hash != self.last_hash:
                 self.last_hash = self.hash
                 send_event(event_name="Agent", event_properties={"llm.agent_hash": self.hash})
         except Exception as exc:

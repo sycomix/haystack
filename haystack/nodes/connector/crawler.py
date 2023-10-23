@@ -16,7 +16,7 @@ try:
     from selenium.webdriver.chrome.service import Service
     from selenium.webdriver.common.by import By
     from webdriver_manager.chrome import ChromeDriverManager
-except (ImportError, ModuleNotFoundError) as ie:
+except ImportError as ie:
     from haystack.utils.import_utils import _optional_component_not_installed
 
     _optional_component_not_installed(__name__, "crawler", ie)
@@ -308,8 +308,7 @@ class Crawler(BaseComponent):
         :param id_hash_keys: The fields that should be used to generate the document id.
         """
 
-        data: Dict[str, Any] = {}
-        data["meta"] = {"url": url}
+        data: Dict[str, Any] = {"meta": {"url": url}}
         if base_url:
             data["meta"]["base_url"] = base_url
         data["content"] = text
@@ -378,11 +377,7 @@ class Crawler(BaseComponent):
             if loading_wait_time is not None:
                 time.sleep(loading_wait_time)
             el = self.driver.find_element(by=By.TAG_NAME, value="body")
-            if extract_hidden_text:
-                text = el.get_attribute("textContent")
-            else:
-                text = el.text
-
+            text = el.get_attribute("textContent") if extract_hidden_text else el.text
             document = self._create_document(url=link, text=text, base_url=base_url, id_hash_keys=id_hash_keys)
 
             if output_dir:
@@ -528,10 +523,10 @@ class Crawler(BaseComponent):
                 if self._is_internal_url(base_url=base_url, sub_link=sub_link) and (
                     not self._is_inpage_navigation(base_url=base_url, sub_link=sub_link)
                 ):
-                    if filter_pattern is not None:
-                        if filter_pattern.search(sub_link):
-                            sub_links.add(sub_link)
-                    else:
+                    if (
+                        filter_pattern is not None
+                        and filter_pattern.search(sub_link)
+                        or filter_pattern is None
+                    ):
                         sub_links.add(sub_link)
-
         return sub_links

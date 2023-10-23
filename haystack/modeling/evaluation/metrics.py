@@ -123,7 +123,7 @@ def compute_metrics(metric: str, preds, labels):
         "text_similarity_metric": text_similarity_metric,
     }
     assert len(preds) == len(labels)
-    if metric in FUNCTION_FOR_METRIC.keys():
+    if metric in FUNCTION_FOR_METRIC:
         if (  # pylint: disable=too-many-boolean-expressions
             (metric == "mcc" and not matthews_corrcoef)
             or (metric == "mse" and not mean_squared_error)
@@ -168,19 +168,17 @@ def compute_report_metrics(head: PredictionHead, preds, labels):
             f"You can register a custom one via register_report(name='{head.ph_output_type}', implementation=<your_report_function>"
         )
 
-    # CHANGE PARAMETERS, not all report_fn accept digits
-    if head.ph_output_type in ["per_sequence"]:
-        # supply labels as all possible combination because if ground truth labels do not cover
-        # all values in label_list (maybe dev set is small), the report will break
-        if head.model_type == "text_similarity":
-            labels = reduce(lambda x, y: x + list(y.astype("long")), labels, [])
-            preds = reduce(lambda x, y: x + [0] * y[0] + [1] + [0] * (len(y) - y[0] - 1), preds, [])  # type: ignore
-            all_possible_labels = list(range(len(head.label_list)))  # type: ignore [arg-type]
-        else:
-            all_possible_labels = head.label_list  # type: ignore [assignment]
-        return report_fn(labels, preds, digits=4, labels=all_possible_labels, target_names=head.label_list)
-    else:
+    if head.ph_output_type not in ["per_sequence"]:
         return report_fn(labels, preds)
+    # supply labels as all possible combination because if ground truth labels do not cover
+    # all values in label_list (maybe dev set is small), the report will break
+    if head.model_type == "text_similarity":
+        labels = reduce(lambda x, y: x + list(y.astype("long")), labels, [])
+        preds = reduce(lambda x, y: x + [0] * y[0] + [1] + [0] * (len(y) - y[0] - 1), preds, [])  # type: ignore
+        all_possible_labels = list(range(len(head.label_list)))  # type: ignore [arg-type]
+    else:
+        all_possible_labels = head.label_list  # type: ignore [assignment]
+    return report_fn(labels, preds, digits=4, labels=all_possible_labels, target_names=head.label_list)
 
 
 def squad_EM(preds, labels):
@@ -264,10 +262,7 @@ def squad_f1_single(pred, label, pred_idx: int = 0):
     pred_end = span.offset_answer_end
 
     if (pred_start + pred_end == 0) or (label_start + label_end == 0):
-        if pred_start == label_start:
-            return 1.0
-        else:
-            return 0.0
+        return 1.0 if pred_start == label_start else 0.0
     pred_span = list(range(pred_start, pred_end + 1))
     label_span = list(range(label_start, label_end + 1))
     n_overlap = len([x for x in pred_span if x in label_span])
@@ -275,14 +270,11 @@ def squad_f1_single(pred, label, pred_idx: int = 0):
         return 0.0
     precision = n_overlap / len(pred_span)
     recall = n_overlap / len(label_span)
-    f1 = (2 * precision * recall) / (precision + recall)
-    return f1
+    return (2 * precision * recall) / (precision + recall)
 
 
 def confidence(preds):
-    conf = 0
-    for pred in preds:
-        conf += pred[0][0].confidence
+    conf = sum(pred[0][0].confidence for pred in preds)
     return conf / len(preds) if len(preds) else 0
 
 
@@ -383,8 +375,7 @@ def text_similarity_acc_and_f1(preds, labels):
     """
     top_1_pred = reduce(lambda x, y: x + [0] * y[0] + [1] + [0] * (len(y) - y[0] - 1), preds, [])
     labels = reduce(lambda x, y: x + list(y.astype("long")), labels, [])
-    res = acc_and_f1(top_1_pred, labels)
-    return res
+    return acc_and_f1(top_1_pred, labels)
 
 
 def text_similarity_avg_ranks(preds, labels) -> float:
@@ -471,6 +462,7 @@ def semantic_answer_similarity(
     pred_label_matrix = []
     lengths: List[Tuple[int, int]] = []
 
+    current_position = 0
     # Based on Modelstring we can load either Bi-Encoders or Cross Encoders.
     # Similarity computation changes for both approaches
     if cross_encoder_used:
@@ -483,12 +475,10 @@ def semantic_answer_similarity(
         grid = []
         for preds, labels in zip(predictions, gold_labels):
             for p in preds:
-                for l in labels:
-                    grid.append((p, l))
+                grid.extend((p, l) for l in labels)
             lengths.append((len(preds), len(labels)))
         scores = model.predict(grid, batch_size=batch_size)
 
-        current_position = 0
         for len_p, len_l in lengths:
             scores_window = scores[current_position : current_position + len_p * len_l]
             # Per predicted doc there are len_l entries comparing it to all len_l labels.
@@ -509,8 +499,6 @@ def semantic_answer_similarity(
         # then compute embeddings
         embeddings = model.encode(all_texts, batch_size=batch_size)
 
-        # then select which embeddings will be used for similarity computations
-        current_position = 0
         for len_p, len_l in lengths:
             pred_embeddings = embeddings[current_position : current_position + len_p, :]
             current_position += len_p

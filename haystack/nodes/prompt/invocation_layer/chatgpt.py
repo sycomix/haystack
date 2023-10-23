@@ -96,9 +96,7 @@ class ChatGPTInvocationLayer(OpenAIInvocationLayer):
 
     def _extract_token(self, event_data: Dict[str, Any]):
         delta = event_data["choices"][0]["delta"]
-        if "content" in delta:
-            return delta["content"]
-        return None
+        return delta["content"] if "content" in delta else None
 
     def _ensure_token_limit(self, prompt: Union[str, List[Dict[str, str]]]) -> Union[str, List[Dict[str, str]]]:
         """Make sure the length of the prompt and answer is within the max tokens limit of the model.
@@ -129,4 +127,4 @@ class ChatGPTInvocationLayer(OpenAIInvocationLayer):
 
     @classmethod
     def supports(cls, model_name_or_path: str, **kwargs) -> bool:
-        return model_name_or_path in ["gpt-3.5-turbo", "gpt-4", "gpt-4-32k"]
+        return model_name_or_path in {"gpt-3.5-turbo", "gpt-4", "gpt-4-32k"}

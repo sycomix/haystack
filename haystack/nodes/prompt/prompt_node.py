@@ -139,12 +139,11 @@ class PromptNode(BaseComponent):
             sa(documents=[Document("I am in love and I feel great!")])
         ```
         """
-        if "prompt_template" in kwargs:
-            prompt_template = kwargs["prompt_template"]
-            kwargs.pop("prompt_template")
-            return self.prompt(prompt_template, *args, **kwargs)
-        else:
+        if "prompt_template" not in kwargs:
             return self.prompt(self.default_prompt_template, *args, **kwargs)
+        prompt_template = kwargs["prompt_template"]
+        kwargs.pop("prompt_template")
+        return self.prompt(prompt_template, *args, **kwargs)
 
     def prompt(self, prompt_template: Optional[Union[str, PromptTemplate]], *args, **kwargs) -> List[Any]:
         """
@@ -162,8 +161,7 @@ class PromptNode(BaseComponent):
 
         # kwargs override model kwargs
         kwargs = {**self._prepare_model_kwargs(), **kwargs}
-        template_to_fill = self.get_prompt_template(prompt_template)
-        if template_to_fill:
+        if template_to_fill := self.get_prompt_template(prompt_template):
             # prompt template used, yield prompts from inputs args
             for prompt in template_to_fill.fill(*args, **kwargs):
                 kwargs_copy = copy.copy(kwargs)
@@ -285,8 +283,7 @@ class PromptNode(BaseComponent):
         # it's a prompt_text
         prompt_text = prompt_template
         output_parser: Optional[BaseOutputParser] = None
-        default_prompt_template = self.get_prompt_template()
-        if default_prompt_template:
+        if default_prompt_template := self.get_prompt_template():
             output_parser = default_prompt_template.output_parser
         return PromptTemplate(name="custom-at-query-time", prompt_text=prompt_text, output_parser=output_parser)
 
@@ -459,23 +456,23 @@ class PromptNode(BaseComponent):
                 raise ValueError("The input variables queries and invocation_contexts should have the same length.")
             input_queries = queries
             input_invocation_contexts = invocation_contexts
-        elif queries is not None and invocation_contexts is None:
+        elif queries is not None:
             input_queries = queries
             input_invocation_contexts = [None] * len(queries)
-        elif queries is None and invocation_contexts is not None:
+        elif invocation_contexts is not None:
             input_queries = [None] * len(invocation_contexts)
             input_invocation_contexts = invocation_contexts
         else:
             input_queries = [None]
             input_invocation_contexts = [None]
 
-        if prompt_templates is not None:
-            if len(prompt_templates) != len(input_queries):
-                raise ValueError("The input variables prompt_templates and queries should have the same length.")
-            input_prompt_templates = prompt_templates
-        else:
+        if prompt_templates is None:
             input_prompt_templates = [None] * len(input_queries)
 
+        elif len(prompt_templates) != len(input_queries):
+            raise ValueError("The input variables prompt_templates and queries should have the same length.")
+        else:
+            input_prompt_templates = prompt_templates
         multi_docs_list = isinstance(documents, list) and len(documents) > 0 and isinstance(documents[0], list)
         single_docs_list = isinstance(documents, list) and len(documents) > 0 and isinstance(documents[0], Document)
 

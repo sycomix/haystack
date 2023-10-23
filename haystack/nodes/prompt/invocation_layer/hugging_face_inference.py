@@ -78,14 +78,13 @@ class HFInferenceEndpointInvocationLayer(PromptModelInvocationLayer):
 
     @property
     def url(self) -> str:
-        if HFInferenceEndpointInvocationLayer.is_inference_endpoint(self.model_name_or_path):
-            # Inference Endpoint URL
-            # i.e. https://o3x2xh3o4m47mxny.us-east-1.aws.endpoints.huggingface.cloud
-            url = self.model_name_or_path
-
-        else:
-            url = f"https://api-inference.huggingface.co/models/{self.model_name_or_path}"
-        return url
+        return (
+            self.model_name_or_path
+            if HFInferenceEndpointInvocationLayer.is_inference_endpoint(
+                self.model_name_or_path
+            )
+            else f"https://api-inference.huggingface.co/models/{self.model_name_or_path}"
+        )
 
     @property
     def headers(self) -> Dict[str, str]:
@@ -195,15 +194,14 @@ class HFInferenceEndpointInvocationLayer(PromptModelInvocationLayer):
     def supports(cls, model_name_or_path: str, **kwargs) -> bool:
         if cls.is_inference_endpoint(model_name_or_path):
             return True
-        else:
-            # Check if the model is an HF inference API
-            task_name: Optional[str] = None
-            is_inference_api = False
-            try:
-                task_name = get_task(model_name_or_path, use_auth_token=kwargs.get("use_auth_token", None))
-                is_inference_api = "api_key" in kwargs
-            except RuntimeError:
-                # This will fail for all non-HF models
-                return False
+        # Check if the model is an HF inference API
+        task_name: Optional[str] = None
+        is_inference_api = False
+        try:
+            task_name = get_task(model_name_or_path, use_auth_token=kwargs.get("use_auth_token", None))
+            is_inference_api = "api_key" in kwargs
+        except RuntimeError:
+            # This will fail for all non-HF models
+            return False
 
-            return is_inference_api and task_name in ["text2text-generation", "text-generation"]
+        return is_inference_api and task_name in ["text2text-generation", "text-generation"]

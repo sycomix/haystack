@@ -40,9 +40,9 @@ class BaseImageToText(BaseComponent):
                 raise ValueError("The ImageToText node only supports image documents.")
             image_file_paths.extend([doc.content for doc in documents])
 
-        results: dict = {}
-        results["documents"] = self.generate_captions(image_file_paths=image_file_paths)
-
+        results: dict = {
+            "documents": self.generate_captions(image_file_paths=image_file_paths)
+        }
         return results, "output_1"
 
     def run_batch(  # type: ignore

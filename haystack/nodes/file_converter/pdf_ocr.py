@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 try:
     from pdf2image import convert_from_path
-except (ImportError, ModuleNotFoundError) as ie:
+except ImportError as ie:
     from haystack.utils.import_utils import _optional_component_not_installed
 
     _optional_component_not_installed(__name__, "ocr", ie)

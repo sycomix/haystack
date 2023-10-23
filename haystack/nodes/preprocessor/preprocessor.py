@@ -118,7 +118,6 @@ class PreProcessor(BasePreProcessor):
                     nltk.download("punkt")
             except FileExistsError as error:
                 logger.debug("NLTK punkt tokenizer seems to be already downloaded. Error message: %s", error)
-                pass
         self.clean_whitespace = clean_whitespace
         self.clean_header_footer = clean_header_footer
         self.clean_empty_lines = clean_empty_lines
@@ -371,8 +370,7 @@ class PreProcessor(BasePreProcessor):
                 elements=elements, split_length=split_length, split_overlap=split_overlap, split_at=split_at
             )
 
-        # create new document dicts for each text split
-        documents = self._create_docs_from_splits(
+        return self._create_docs_from_splits(
             text_splits=text_splits,
             splits_pages=splits_pages,
             splits_start_idxs=splits_start_idxs,
@@ -381,8 +379,6 @@ class PreProcessor(BasePreProcessor):
             split_overlap=split_overlap,
             id_hash_keys=id_hash_keys,
         )
-
-        return documents
 
     @staticmethod
     def _clean_whitespace(text: str, headlines: List[Dict]) -> Tuple[str, List[Dict]]:
@@ -521,7 +517,7 @@ class PreProcessor(BasePreProcessor):
         text_splits = []
         for sl in list_splits:
             txt = "".join(sl)
-            if len(txt) > 0:
+            if txt != "":
                 text_splits.append(txt)
 
         return text_splits, splits_pages, splits_start_idxs
@@ -586,7 +582,7 @@ class PreProcessor(BasePreProcessor):
         for seg in segments:
             current_units = [unit for unit in seg if unit is not None]
             txt = split_at.join(current_units)
-            if len(txt) > 0:
+            if txt != "":
                 text_splits.append(txt)
                 splits_pages.append(cur_page)
                 splits_start_idxs.append(cur_start_idx)
@@ -724,8 +720,7 @@ class PreProcessor(BasePreProcessor):
         if found_footer:
             pages = [page.replace(found_footer, "") for page in pages]
         logger.debug("Removed header '%s' and footer '%s' in document", found_header, found_footer)
-        text = "\f".join(pages)
-        return text
+        return "\f".join(pages)
 
     def _ngram(self, seq: str, n: int) -> Generator[str, None, None]:
         """
@@ -741,17 +736,15 @@ class PreProcessor(BasePreProcessor):
         seq = seq.replace("\t", " \t")
 
         words = seq.split(" ")
-        ngrams = (
-            " ".join(words[i : i + n]).replace(" \n", "\n").replace(" \t", "\t") for i in range(0, len(words) - n + 1)
+        return (
+            " ".join(words[i : i + n]).replace(" \n", "\n").replace(" \t", "\t")
+            for i in range(0, len(words) - n + 1)
         )
-
-        return ngrams
 
     def _allngram(self, seq: str, min_ngram: int, max_ngram: int) -> Set[str]:
         lengths = range(min_ngram, max_ngram) if max_ngram else range(min_ngram, len(seq))
         ngrams = map(partial(self._ngram, seq), lengths)
-        res = set(chain.from_iterable(ngrams))
-        return res
+        return set(chain.from_iterable(ngrams))
 
     def _find_longest_common_ngram(
         self, sequences: List[str], max_ngram: int = 30, min_ngram: int = 3
@@ -809,8 +802,7 @@ class PreProcessor(BasePreProcessor):
         )
         sentence_tokenizer._lang_vars._re_period_context = re_period_context
 
-        sentences = sentence_tokenizer.tokenize(text)
-        return sentences
+        return sentence_tokenizer.tokenize(text)
 
     def _load_sentence_tokenizer(self, language_name: Optional[str]) -> "nltk.tokenize.punkt.PunktSentenceTokenizer":
         if not nltk:
@@ -872,11 +864,12 @@ class PreProcessor(BasePreProcessor):
             # Remove already used page break
             num_page_breaks -= 1
         # Increment page counter if new split starts with a page break
-        if split_overlap and overlapping_sents:
-            if overlapping_sents[0].startswith("\f"):
-                num_page_breaks += 1
-        else:
-            if current_sent.startswith("\f"):
-                num_page_breaks += 1
-
+        if (
+            split_overlap
+            and overlapping_sents
+            and overlapping_sents[0].startswith("\f")
+            or (not split_overlap or not overlapping_sents)
+            and current_sent.startswith("\f")
+        ):
+            num_page_breaks += 1
         return num_page_breaks

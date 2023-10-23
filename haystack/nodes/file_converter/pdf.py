@@ -10,7 +10,7 @@ from more_itertools import divide
 
 try:
     import fitz
-except (ImportError, ModuleNotFoundError) as ie:
+except ImportError as ie:
     from haystack.utils.import_utils import _optional_component_not_installed
 
     _optional_component_not_installed(__name__, "pdf", ie)
@@ -268,15 +268,11 @@ class PDFToTextConverter(BaseConverter):
                                 If set to None (the default value), the value defined in the class initialization is used.
                                 If set to True, the total number of cores is used. To specify the number of cores to use, set it to an integer.
         """
-        if start_page is None:
-            start_page = 0
-        else:
-            start_page = start_page - 1
-
+        start_page = 0 if start_page is None else start_page - 1
         doc = fitz.open(file_path)
         page_count = int(doc.page_count)
 
-        if end_page is None or (end_page is not None and end_page > page_count):
+        if end_page is None or end_page > page_count:
             end_page = page_count
 
         document = ""
@@ -291,8 +287,8 @@ class PDFToTextConverter(BaseConverter):
                 document += page.get_text("text", textpage=partial_tp, sort=sort_by_position) + "\f"
         else:
             cpu = cpu_count() if isinstance(multiprocessing, bool) else multiprocessing
-            page_list = [i for i in range(start_page, end_page)]
-            cpu = cpu if len(page_list) > cpu else len(page_list)
+            page_list = list(range(start_page, end_page))
+            cpu = min(len(page_list), cpu)
             parts = divide(cpu, page_list)
             pages_mp = [(i, file_path, parts, sort_by_position, ocr, ocr_language) for i in range(cpu)]
 

@@ -97,23 +97,22 @@ class BaseReader(BaseComponent):
         documents = [d for d in documents if not isinstance(d.content, str) or d.content.strip() != ""]
         if documents:
             results = predict(query=query, documents=documents, top_k=top_k)
+        elif hasattr(self, "return_no_answers") and self.return_no_answers:
+            no_ans_prediction = Answer(
+                answer="",
+                type="extractive",
+                score=1.0
+                if hasattr(self, "use_confidence_scores") and self.use_confidence_scores
+                else 1024.0,  # just a pseudo prob for now or old score,
+                context=None,
+                offsets_in_context=[Span(start=0, end=0)],
+                offsets_in_document=[Span(start=0, end=0)],
+                document_ids=None,
+                meta=None,
+            )
+            results = {"answers": [no_ans_prediction]}
         else:
-            if hasattr(self, "return_no_answers") and self.return_no_answers:
-                no_ans_prediction = Answer(
-                    answer="",
-                    type="extractive",
-                    score=1.0
-                    if hasattr(self, "use_confidence_scores") and self.use_confidence_scores
-                    else 1024.0,  # just a pseudo prob for now or old score,
-                    context=None,
-                    offsets_in_context=[Span(start=0, end=0)],
-                    offsets_in_document=[Span(start=0, end=0)],
-                    document_ids=None,
-                    meta=None,
-                )
-                results = {"answers": [no_ans_prediction]}
-            else:
-                results = {"answers": []}
+            results = {"answers": []}
 
         # Add corresponding document_name and more meta data, if an answer contains the document_id
         results["answers"] = [

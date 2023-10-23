@@ -102,22 +102,24 @@ class HFLocalInvocationLayer(PromptModelInvocationLayer):
 
         torch_dtype = model_input_kwargs.get("torch_dtype")
         if torch_dtype is not None:
-            if isinstance(torch_dtype, str):
-                if "torch." in torch_dtype:
-                    torch_dtype_resolved = getattr(torch, torch_dtype.strip("torch."))
-                elif torch_dtype == "auto":
-                    torch_dtype_resolved = torch_dtype
-                else:
-                    raise ValueError(
-                        f"torch_dtype should be a torch.dtype, a string with 'torch.' prefix or the string 'auto', got {torch_dtype}"
-                    )
-            elif isinstance(torch_dtype, torch.dtype):
+            if isinstance(torch_dtype, str) and "torch." in torch_dtype:
+                torch_dtype_resolved = getattr(torch, torch_dtype.strip("torch."))
+            elif (
+                isinstance(torch_dtype, str)
+                and torch_dtype == "auto"
+                or not isinstance(torch_dtype, str)
+                and isinstance(torch_dtype, torch.dtype)
+            ):
                 torch_dtype_resolved = torch_dtype
+            elif isinstance(torch_dtype, str):
+                raise ValueError(
+                    f"torch_dtype should be a torch.dtype, a string with 'torch.' prefix or the string 'auto', got {torch_dtype}"
+                )
             else:
                 raise ValueError(f"Invalid torch_dtype value {torch_dtype}")
             model_input_kwargs["torch_dtype"] = torch_dtype_resolved
 
-        if len(model_input_kwargs) > 0:
+        if model_input_kwargs:
             logger.info("Using model input kwargs %s in %s", model_input_kwargs, self.__class__.__name__)
         self.task_name = get_task(model_name_or_path, use_auth_token=use_auth_token)
         self.pipe = pipeline(
@@ -182,7 +184,7 @@ class HFLocalInvocationLayer(PromptModelInvocationLayer):
                 gen_dict.pop("transformers_version", None)
                 model_input_kwargs.update(gen_dict)
 
-            is_text_generation = "text-generation" == self.task_name
+            is_text_generation = self.task_name == "text-generation"
             # Prefer return_full_text is False for text-generation (unless explicitly set)
             # Thus only generated text is returned (excluding prompt)
             if is_text_generation and "return_full_text" not in model_input_kwargs:
@@ -234,10 +236,9 @@ class HFLocalInvocationLayer(PromptModelInvocationLayer):
         )
 
         tokenized_payload = self.pipe.tokenizer.tokenize(prompt)
-        decoded_string = self.pipe.tokenizer.convert_tokens_to_string(
+        return self.pipe.tokenizer.convert_tokens_to_string(
             tokenized_payload[: model_max_length - n_answer_tokens]
         )
-        return decoded_string
 
     @classmethod
     def supports(cls, model_name_or_path: str, **kwargs) -> bool:

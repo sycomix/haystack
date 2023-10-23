@@ -74,8 +74,7 @@ class InMemoryKnowledgeGraph(BaseKnowledgeGraph):
         :return: all triples stored in the index
         """
         sparql_query = "SELECT * WHERE { ?s ?p ?o. }"
-        results = self.query(sparql_query=sparql_query, index=index)
-        return results
+        return self.query(sparql_query=sparql_query, index=index)
 
     def get_all_subjects(self, index: Optional[str] = None):
         """
@@ -85,8 +84,7 @@ class InMemoryKnowledgeGraph(BaseKnowledgeGraph):
         :return: all subjects stored in the index
         """
         sparql_query = "SELECT ?s WHERE { ?s ?p ?o. }"
-        results = self.query(sparql_query=sparql_query, index=index)
-        return results
+        return self.query(sparql_query=sparql_query, index=index)
 
     def get_all_predicates(self, index: Optional[str] = None):
         """
@@ -96,8 +94,7 @@ class InMemoryKnowledgeGraph(BaseKnowledgeGraph):
         :return: all predicates stored in the index
         """
         sparql_query = "SELECT ?p WHERE { ?s ?p ?o. }"
-        results = self.query(sparql_query=sparql_query, index=index)
-        return results
+        return self.query(sparql_query=sparql_query, index=index)
 
     def _create_document_field_map(self) -> Dict:
         """
@@ -113,8 +110,7 @@ class InMemoryKnowledgeGraph(BaseKnowledgeGraph):
         :return: all objects stored in the index
         """
         sparql_query = "SELECT ?o WHERE { ?s ?p ?o. }"
-        results = self.query(sparql_query=sparql_query, index=index)
-        return results
+        return self.query(sparql_query=sparql_query, index=index)
 
     def query(self, sparql_query: str, index: Optional[str] = None, headers: Optional[Dict[str, str]] = None):
         """
@@ -129,14 +125,13 @@ class InMemoryKnowledgeGraph(BaseKnowledgeGraph):
 
         if raw_results.askAnswer is not None:
             return raw_results.askAnswer
-        else:
-            formatted_results = []
-            for b in raw_results.bindings:
-                formatted_result = {}
-                items = list(b.items())
-                for item in items:
-                    type_ = item[0].toPython()[1:]
-                    uri = item[1].toPython()  # type: ignore [attr-defined]
-                    formatted_result[type_] = {"type": "uri", "value": uri}
-                formatted_results.append(formatted_result)
-            return formatted_results
+        formatted_results = []
+        for b in raw_results.bindings:
+            formatted_result = {}
+            items = list(b.items())
+            for item in items:
+                type_ = item[0].toPython()[1:]
+                uri = item[1].toPython()  # type: ignore [attr-defined]
+                formatted_result[type_] = {"type": "uri", "value": uri}
+            formatted_results.append(formatted_result)
+        return formatted_results
